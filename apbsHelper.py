@@ -19,6 +19,7 @@ import random
 import sys
 
 RESULTS_PATH = Path('results')
+RESULTS_PATH.mkdir(exist_ok=True,parents=True)
 
 def generate_uid(length: int = 7) -> str:
     return ''.join(random.choices('0123456789abcdef', k=length))
