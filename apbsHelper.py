@@ -1,5 +1,5 @@
 """
-apbsHelper
+apbsHelper.py
 
 Python tool to aid in the running of multiple APBS simulations.
 See README for configuration details.
@@ -15,6 +15,7 @@ from src.utils.setup_logs import setup_log
 from pathlib import Path
 from datetime import date
 import pandas as pd
+import logging
 import random
 import sys
 
@@ -31,7 +32,13 @@ def main() -> None:
 
     meshes_to_run = []
     for yaml in sys.argv[1:]:
-        mesh = ConfigHandler(yaml)
+        if yaml['log_level'] == 'info': # type: ignore
+            log_level = logging.INFO
+        elif yaml['log_level'] == 'debug': # type: ignore
+            log_level = logging.DEBUG
+        else:
+            raise ValueError("Unknown log level. Must be 'info' or 'debug'")
+        mesh = ConfigHandler(yaml,log_level=log_level)
         meshes_to_run.append(mesh)
 
     if len(meshes_to_run) == 1:

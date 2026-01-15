@@ -1,24 +1,24 @@
 #Example Config File
 name: rna_example_config
 
-config_only: false #Only configure the simulations. Does not run APBS
+config_only: false #Only configure the simulations, do not run APBS
 log_level: info
-max_threads: 4 #Max amount of parallel simulations
+max_threads: 2 #Max amount of parallel simulations
 
 cases_to_run:
     - case_01
     - case_02
     - case_03
 
-pdb_handler: src.handlers.test_handler.TestHandler
+pdb_handler: src.handlers.example_handler.TestHandler #Pdb handler class. Must be subclass of HandlerFunction
 pdb_directory: pdbFiles
-core_pdb_filename: 2rna.pdb
+core_pdb_filename: example_2rna.pdb
 
 #Global simulation settings (Overriden by case settings if present)
 global_sim_options:
-    mesh_size: 0.300
+    mesh_size: 0.9
     coarse_grain: false
-    linear_pb: true
+    linear_pb: false
     keep_complex_dx: false
 
 global_handler_options:
@@ -26,7 +26,7 @@ global_handler_options:
         cg_charges: [[-9.75]]
         rotation_angle: 0
     variants:
-      distance: [0, 15, 20, 30]     #Define number of simulations in case. Each item is one simulation under the case.
+      distance: [0, 15]     #Define number of simulations in case. Each item is one simulation under the case.
 
 #Cases definition
 cases:
@@ -34,7 +34,7 @@ cases:
       sim_options:                #Simulation options for the case. Overrides global settings.
         coarse_grain: true
         linear_pb: true
-        keep_complex_dx: true
+        keep_complex_dx: false
       handler_options:            #Options passed to handler function for all simulations under the case.
         base:
             cg_charges: [[-9.75]]
@@ -47,7 +47,7 @@ cases:
       sim_options:                #Simulation options for the case. Overrides global settings.
         coarse_grain: true
         linear_pb: false
-        keep_complex_dx: true
+        keep_complex_dx: false
       handler_options:            #Options passed to handler function for all simulations under the case.
         base:
             rotation_angle: 120
@@ -57,7 +57,7 @@ cases:
       sim_options:                #Simulation options for the case. Overrides global settings.
         coarse_grain: true
         pb_type: linear
-        keep_complex_dx: true
+        keep_complex_dx: false
       handler_options:            #Options passed to handler function for all simulations under the case.
         base:
             cg_charges: [[-9.85]]

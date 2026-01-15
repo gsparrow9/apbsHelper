@@ -28,6 +28,8 @@ class ConfigHandler:
                                   self.config['core_pdb_filename'])
         self._create_top_level()
         self.cases = self._create_cases()
+        if not self.core_pdb_path.exists():
+            raise ValueError('Missing core pdb file. Check path')
         pass
 
     def __repr__(self) -> str:
@@ -59,6 +61,9 @@ class ConfigHandler:
         for case_config in self.config['cases']:
             case_handler_opts = get_options('handler_options',case_config) 
             case_sim_opts = get_options('sim_options',case_config)
+
+            if case_config['name'] not in self.config['cases_to_run']:
+                continue
             handler_options = self._merge_config(global_handler_opts,case_handler_opts)
             sim_options = self._merge_config(global_sim_opts,case_sim_opts)
 

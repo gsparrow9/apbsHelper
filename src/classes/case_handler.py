@@ -238,7 +238,8 @@ class CaseHandler:
             'core_pdb':[],
             'case_name':[],
             'sim_name':[],
-            'wall_dst':[]
+            'wall_dst':[],
+            'status':[]
         }
 
         energy_keys = [
@@ -285,6 +286,11 @@ class CaseHandler:
             results['sim_path'].append(result.sim_path)
             results['iso_left_path'].append(runner.iso_left_sim.sim_path)
             results['iso_right_path'].append(runner.iso_right_sim.sim_path)
+
+            if result.finished_ok:
+                results['status'].append('OK')
+            else:
+                results['status'].append('ERROR')
 
             if self.handler_options['base']:
                 for column in base_columns: # type: ignore

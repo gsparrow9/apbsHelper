@@ -1,6 +1,6 @@
 from src.utils.setup_logs import setup_log
-from src.utils import fakeTools as tools                #Placeholder tools file.
-from src.utils import fakeApbsTool as apbs_tool         #Placeholder tools file.
+from src.utils import tools as tools                
+from src.utils import apbs_tool as apbs_tool         
 from src.classes.handler_functions import HandlerFunction
 from typing import Optional, Dict, Tuple, Literal
 from dataclasses import dataclass
@@ -39,13 +39,13 @@ class SimulationResult:
 
         if self.is_isolated:
             _energies = {
-                'solv':apbs_tool.get_energy_from_log(self.apbs_log),
-                'col':tools.get_coulomb(self.pqr_file)
+                'solv':apbs_tool.extract_energy_from_log(self.apbs_log),
+                'col':tools.calc_coulomb(self.pqr_file)
             }
             return _energies
         else:
-            solvation = apbs_tool.get_energy_from_log(self.apbs_log)
-            coulomb = tools.get_coulomb(self.pqr_file)
+            solvation = apbs_tool.extract_energy_from_log(self.apbs_log)
+            coulomb = tools.calc_coulomb(self.pqr_file)
             dd_g_solv = solvation - self.left_iso_energies['solv'] - self.right_iso_energies['solv'] # type: ignore
             dd_g_col = coulomb - self.left_iso_energies['col'] - self.right_iso_energies['col'] # type: ignore
             _energies = {
@@ -63,15 +63,11 @@ class SimulationResult:
 
     def to_json(self,filename: str|Path) -> None:
         out_dict = {}
-        out_dict['sim_path'] = self.sim_path
-        out_dict['pqr_file'] = self.pqr_file
-        out_dict['apbs_log'] = self.apbs_log
+        out_dict['sim_path'] = str(self.sim_path)
+        out_dict['pqr_file'] = str(self.pqr_file)
+        out_dict['apbs_log'] = str(self.apbs_log)
         out_dict['finished_ok'] = self.finished_ok
         out_dict['is_isolated'] = self.is_isolated
-        
-        if self.is_isolated:
-            out_dict['left_iso_path'] = self.left_iso_sim.sim_path # type: ignore
-            out_dict['right_iso_path'] = self.right_iso_sim.sim_path # type: ignore
 
         if self.misc is not None: 
             out_dict['misc'] = self.misc
@@ -79,6 +75,10 @@ class SimulationResult:
             out_dict['misc'] = None
         
         out_dict['energies'] = self.energies
+        
+        if not self.is_isolated:
+            out_dict['wall_distance'] = self.wall_distance
+
         with open(filename,'w') as f:
             json.dump(out_dict,f)
         return None
@@ -109,7 +109,7 @@ class SimulationHandler:
         self.sim_path = Path(sim_path)
 
         self.sim_files = {}
-        self.sim_files['pdb'] = self.sim_path / self.core_pdb.name
+        self.sim_files['pdb'] = self.sim_path / Path(self.core_pdb.name)
         self.sim_files['pqr'] = self.sim_files['pdb'].with_suffix('.pqr')
         self.sim_files['json'] = self.sim_files['pdb'].with_suffix('.json')
         self.sim_files['apbs_log'] = self.sim_files['pdb'].with_suffix('.log')
@@ -146,10 +146,10 @@ class SimulationHandler:
             self.isolated_type = None
             self.iso_right_sim = iso_right_sim
             self.iso_left_sim = iso_left_sim
-            self.sim_files['left_pqr'] = Path('left_' + self.sim_files['pqr'].stem + '.pqr')
-            self.sim_files['right_pqr'] = Path('right_' + self.sim_files['pqr'].stem + '.pqr')
-            self.sim_files['left_xyzr'] = Path('left_' + self.sim_files['pqr'].stem + '.xyzr')
-            self.sim_files['right_xyzr'] = Path('right_' + self.sim_files['pqr'].stem + '.xyzr')
+            self.sim_files['left_pqr'] = self.sim_path / Path('left_' + self.sim_files['pqr'].stem + '.pqr')
+            self.sim_files['right_pqr'] = self.sim_path / Path('right_' + self.sim_files['pqr'].stem + '.pqr')
+            self.sim_files['left_xyzr'] = self.sim_path / Path('left_' + self.sim_files['pqr'].stem + '.xyzr')
+            self.sim_files['right_xyzr'] = self.sim_path / Path('right_' + self.sim_files['pqr'].stem + '.xyzr')
 
         if sim_type != 'allAtom' and sim_type != 'coarseGrained':
             raise ValueError("sim_type must be 'allAtom' or 'coarseGrained'")
@@ -167,7 +167,11 @@ class SimulationHandler:
         
         if self.sim_configured or self.sim_exists:
             return None
-        self.logger.info(f'Configuring simulation {self.sim_name} - {self.sim_path}')
+
+        if self.isolated:
+            self.logger.info(f'Configuring simulation {self.isolated_type} {self.sim_name} - {self.sim_path}')
+        else:
+            self.logger.info(f'Configuring simulation {self.sim_name} - {self.sim_path}')
         self.sim_path.mkdir(exist_ok=True, parents=True)
 
         #Generating PDB file with handler_func
@@ -242,8 +246,14 @@ class SimulationHandler:
         return None
 
     def run_simulation(self) -> None:
-        if not self.isolated and self.iso_right_sim._finished_ok and self.iso_left_sim._finished_ok: # type: ignore
-            self.logger.error('Isolated simulations for {self.sim_name} have errors')
+        if self.isolated:
+            self.logger.info(f'Running simulation {self.isolated_type} {self.sim_name} - {self.sim_path}')
+        else:
+            self.logger.info(f'Running simulation {self.sim_name} - {self.sim_path}')
+        if ((not self.isolated)
+            and (not self.iso_right_sim._finished_ok or not self.iso_left_sim._finished_ok) # type: ignore
+        ):
+            self.logger.error(f'Isolated simulations for {self.sim_name} have errors')
             raise RuntimeError('Isolated simulations for complex simulation have not run')
 
         if not self.sim_configured:
@@ -292,9 +302,9 @@ class SimulationHandler:
                 misc,
                 True
             )
-            self.logger.info(f'Simulation {self.sim_name} ERROR')
+            self.logger.info(f'Simulation {self.sim_name} - ERROR')
             raise
-        self.logger.info(f'Simulation {self.sim_name} OK')
+        self.logger.info(f'Simulation {self.sim_name} - OK')
         self.result.to_json(self.sim_files['json'])
         return None
 
@@ -309,6 +319,7 @@ class SimulationHandler:
         is_isolated = dump['is_isolated']
         misc = dump['misc']
         energies = dump['energies']
+        self._finished_ok = finished_ok
 
         if is_isolated:
             result = SimulationResult(
@@ -328,16 +339,21 @@ class SimulationHandler:
                 sim_path,
                 finished_ok,
                 misc,
-                True,
+                is_isolated,
                 left_iso_energies=left_energies,
                 right_iso_energies=right_energies,
                 wall_distance=dump['wall_distance']
             )
+            self.wall_distance = dump['wall_distance']
         
         return result
 
     def _execute_apbs(self) -> Tuple:
-        run_apbs = ['apbs',self.sim_files['apbs_in']]
+        if self.isolated:
+            self.logger.info(f'Executing APBS for simulation {self.isolated_type} {self.sim_name}')
+        else:
+            self.logger.info(f'Executing APBS for simulation {self.sim_name}')
+        run_apbs = ['apbs',self.sim_files['apbs_in'].name]
         
         start_time = time.time()
         apbs_log = open(self.sim_files['apbs_log'],'w')
