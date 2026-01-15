@@ -15,10 +15,17 @@ class ConfigHandler:
             yaml_file: Path|str,
             log_level=logging.INFO
     ) -> None:
-        setup_log(log_level)
-        self.logger = logging.getLogger(self.__class__.__name__)
         yaml_file = Path(yaml_file)
         self.config = self._ingest_config(yaml_file)
+        if 'log_level' in self.config.keys():
+            if self.config['log_level'] == 'info':
+                log_level = logging.INFO
+            elif self.config['log_level'] == 'debug':
+                log_level = logging.DEBUG
+            else:
+                raise ValueError("Unknown log level in config. Must be 'info' or 'debug'")
+        setup_log(log_level)
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.config_name = self.config['name']
         self.pdb_handler_func = self._import_pdb_handler()
         self.ran_ok = False
@@ -96,7 +103,6 @@ class ConfigHandler:
         needed_keys = [
             'name',
             'config_only',
-            'log_level',
             'max_threads',
             'cases_to_run',
             'pdb_handler',

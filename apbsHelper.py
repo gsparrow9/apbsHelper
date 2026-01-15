@@ -32,13 +32,7 @@ def main() -> None:
 
     meshes_to_run = []
     for yaml in sys.argv[1:]:
-        if yaml['log_level'] == 'info': # type: ignore
-            log_level = logging.INFO
-        elif yaml['log_level'] == 'debug': # type: ignore
-            log_level = logging.DEBUG
-        else:
-            raise ValueError("Unknown log level. Must be 'info' or 'debug'")
-        mesh = ConfigHandler(yaml,log_level=log_level)
+        mesh = ConfigHandler(yaml)
         meshes_to_run.append(mesh)
 
     if len(meshes_to_run) == 1:
