@@ -50,7 +50,7 @@ class CaseHandler:
         if sim_name_format is None:
             sim_name_format = 'N${N}_${variant}'
 
-        self._create_simulation_objects(self.handler_options)
+        self._create_simulation_objects(self.handler_options,coarse_grained=coarse_grain)
         self.logger.debug(f'Created {self}')
         pass
 
@@ -93,8 +93,8 @@ class CaseHandler:
             sim_name = fmt.safe_substitute(values)
 
             complex_sim_path = self.case_path / 'complex' / sim_name
-            iso_left_sim_path = self.case_path / 'isolatedRight' / sim_name
-            iso_right_sim_path = self.case_path / 'isolatedLeft' / sim_name
+            iso_left_sim_path = self.case_path / 'isolatedLeft' / sim_name
+            iso_right_sim_path = self.case_path / 'isolatedRight' / sim_name
 
             if coarse_grained:
                 sim_type = 'coarseGrained'
@@ -175,6 +175,7 @@ class CaseHandler:
 
         if save_wall_distances:
             self.wall_distances.to_csv(self.case_path / f'{self.case_name}_wall_dst.csv',index=False)
+        self.ready_to_run = True
 
         return None
 
@@ -209,6 +210,8 @@ class CaseHandler:
             return None
 
     def run_case_sims(self) -> None:
+        if not self.ready_to_run:
+            self.configure_case_sims()
         self.logger.info(f'Running simulations for case: {self.case_name}')
         isolated_runners = []
         isolated_runners.extend(self.left_isolated_sims.values())
