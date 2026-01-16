@@ -7,6 +7,7 @@ import pandas as pd
 import importlib
 import logging
 import yaml
+import time
 
 class ConfigHandler:
 
@@ -143,12 +144,15 @@ class ConfigHandler:
         return None
 
     def run_all_cases(self) -> None:
-
+        self.logger.info(f'Running config file {self.config_name}')
+        start_time = time.time()
         for name, case in self.cases.items():
             self.logger.info(f'Running case {name}')
             case.run_case_sims()
+        wall_time = time.time() - start_time
         self.configured_ok = True
         self.ran_ok = True
+        self.logger.info(f'Finished running config file {self.config_name} in {wall_time} (s)')
         return None
 
     @property

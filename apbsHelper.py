@@ -15,7 +15,6 @@ from src.utils.setup_logs import setup_log
 from pathlib import Path
 from datetime import date
 import pandas as pd
-import logging
 import random
 import sys
 
