@@ -140,9 +140,9 @@ class SimulationHandler:
             self.iso_left_sim = None
         else:
             if iso_left_sim is None:
-                raise ValueError('iso_left_result is needed when isolated=True')
+                raise ValueError('iso_left_result is needed when isolated=False')
             if iso_right_sim is None:
-                raise ValueError('iso_right_result is needed when isolated=True')
+                raise ValueError('iso_right_result is needed when isolated=False')
             self.isolated_type = None
             self.iso_right_sim = iso_right_sim
             self.iso_left_sim = iso_left_sim
