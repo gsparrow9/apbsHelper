@@ -17,6 +17,7 @@ class CaseHandler:
             handler_func: HandlerFunction,
             mesh_size: float,
             coarse_grain: bool=False,
+            yukawa: bool=False,
             keep_complex_dx: bool=False,
             max_threads: int=1,
             linear_pb: bool=False,
@@ -36,6 +37,9 @@ class CaseHandler:
         self.right_isolated_sims = {}
         self.complex_sims = {}
         self.coarse_grain = coarse_grain
+        self.yukawa = yukawa
+        if self.yukawa:
+            self.coarse_grain=True
         self.keep_dx = keep_complex_dx
         self.max_threads = max_threads
         self.linear_pb = linear_pb
@@ -50,7 +54,7 @@ class CaseHandler:
         if sim_name_format is None:
             sim_name_format = 'N${N}_${variant}'
 
-        self._create_simulation_objects(self.handler_options,coarse_grained=coarse_grain)
+        self._create_simulation_objects(self.handler_options,coarse_grained=coarse_grain,yukawa=yukawa)
         self.logger.debug(f'Created {self}')
         pass
 
@@ -61,7 +65,8 @@ class CaseHandler:
             self,
             handler_options: Dict,
             sim_name_format: str='N${N}_${variant}',
-            coarse_grained:bool=False
+            coarse_grained:bool=False,
+            yukawa:bool=False
     ) -> Tuple[Dict,Dict,Dict]:
 
         left_isolated_runners = {}
@@ -96,7 +101,9 @@ class CaseHandler:
             iso_left_sim_path = self.case_path / 'isolatedLeft' / sim_name
             iso_right_sim_path = self.case_path / 'isolatedRight' / sim_name
 
-            if coarse_grained:
+            if yukawa:
+                sim_type = 'yukawaCoarseGrained'
+            elif coarse_grained:
                 sim_type = 'coarseGrained'
             else:
                 sim_type = 'allAtom'
@@ -242,6 +249,7 @@ class CaseHandler:
             'case_name':[],
             'sim_name':[],
             'wall_dst':[],
+            'yukawa':[],
             'status':[]
         }
 
@@ -287,6 +295,7 @@ class CaseHandler:
             results['wall_dst'].append(runner.wall_distance)
             results['case_path'].append(self.case_path)
             results['sim_path'].append(result.sim_path)
+            results['yukawa'].append(result.yukawa)
             results['iso_left_path'].append(runner.iso_left_sim.sim_path)
             results['iso_right_path'].append(runner.iso_right_sim.sim_path)
 

@@ -258,7 +258,6 @@ def calc_coulomb(pqr_file: str|Path, epsilon_r:float=2) -> float:
     col_energy = col_energy*NA/1000 #kJ/mol
     return col_energy
 
-
 def create_pqr_cg(
         pqr_file: str,
         cg_pos: Dict,
@@ -423,3 +422,21 @@ def gen_isolated_pqr(pqr_file: str, chains: List[str]) -> int:
         stdout=subprocess.DEVNULL
     )
     return 0
+
+def calc_yukawa(pqr_file: str|Path, kappa: float=1.1619E9, epsilon_r:float=78.54) -> float:
+    e = 1.60217663E-19 #C
+    epsilon_0 = 8.8541878188E-12 #F/m 
+    NA = 6.02214076E23
+
+    pqr = mda.Universe(pqr_file)
+    charges = pqr.atoms.charges  # type: ignore 
+    coords = pqr.atoms.positions # type: ignore
+    r_ij = np.linalg.norm(coords[:,None,:]-coords[None,:,:],axis=-1)*1E-10 #m
+    r_ij = np.where(r_ij==0,np.nan,r_ij)
+    q_ij = np.outer(charges,charges)*e*e
+    a_ij = q_ij*np.exp(-kappa*r_ij)/(4*np.pi*epsilon_0*epsilon_r*r_ij)
+    a_ij = np.nan_to_num(a_ij,nan=0)
+    yukawa = np.triu(a_ij,k=1).sum() #J
+    yukawa = yukawa*NA/1000 #kJ/mol
+
+    return yukawa

@@ -13,16 +13,20 @@ import time
 @dataclass(frozen=True)
 class SimulationResult:
     pqr_file: Path
-    apbs_log: Path
     sim_path: Path
-    finished_ok: bool                                     #Sim status. Ok or Error
+    finished_ok: bool                            #Sim status. Ok or Error
+    yukawa: bool
+    apbs_log: Optional[Path] = None
     misc: Optional[Dict] = None
-    is_isolated: Optional[bool] = False                   #Isolated or Complex
+    is_isolated: Optional[bool] = False          #Isolated or Complex
     left_iso_energies: Optional[Dict] = None     #Needed if is_isolated
     right_iso_energies: Optional[Dict] = None    #Needed if is_isolated
     wall_distance: Optional[float] = None        #Needed if complex
 
     def __post_init__(self):
+        if not self.yukawa:
+            if self.apbs_log is None:
+                raise ValueError('Need apbs log when yukawa=False')
         if self.is_isolated:
             if self.left_iso_energies is not None or self.right_iso_energies is not None:
                 raise ValueError('left_iso_sim/right_iso_sim must be None when is_isolated=True')
@@ -38,36 +42,60 @@ class SimulationResult:
             return {}
 
         if self.is_isolated:
-            _energies = {
-                'solv':apbs_tool.extract_energy_from_log(self.apbs_log),
-                'col':tools.calc_coulomb(self.pqr_file)
-            }
+            if self.yukawa:
+                _energies = {
+                    'solv':tools.calc_yukawa(self.pqr_file),
+                    'col':tools.calc_coulomb(self.pqr_file)
+                }
+            else:
+                _energies = {
+                    'solv':apbs_tool.extract_energy_from_log(self.apbs_log),
+                    'col':tools.calc_coulomb(self.pqr_file)
+                }
             return _energies
         else:
-            solvation = apbs_tool.extract_energy_from_log(self.apbs_log)
+            if self.yukawa:
+                solvation = tools.calc_yukawa(self.pqr_file)
+            else:
+                solvation = apbs_tool.extract_energy_from_log(self.apbs_log)
             coulomb = tools.calc_coulomb(self.pqr_file)
             dd_g_solv = solvation - self.left_iso_energies['solv'] - self.right_iso_energies['solv'] # type: ignore
             dd_g_col = coulomb - self.left_iso_energies['col'] - self.right_iso_energies['col'] # type: ignore
-            _energies = {
-                'solv':solvation,
-                'col':coulomb,
-                'solv_left':self.left_iso_energies['solv'], # type: ignore
-                'col_left':self.left_iso_energies['col'], # type: ignore
-                'solv_right':self.right_iso_energies['solv'], # type: ignore
-                'col_right':self.right_iso_energies['col'], # type: ignore
-                'dd_g_solv':dd_g_solv,
-                'dd_g_col':dd_g_col,
-                'binding':dd_g_solv + dd_g_col
-            }
+
+            if self.yukawa:
+                _energies = {
+                    'solv':solvation,
+                    'col':coulomb,
+                    'solv_left':self.left_iso_energies['solv'], # type: ignore
+                    'col_left':self.left_iso_energies['col'], # type: ignore
+                    'solv_right':self.right_iso_energies['solv'], # type: ignore
+                    'col_right':self.right_iso_energies['col'], # type: ignore
+                    'dd_g_solv':dd_g_solv,
+                    'dd_g_col':dd_g_col,
+                    'binding':dd_g_solv
+                }
+            else:
+                _energies = {
+                    'solv':solvation,
+                    'col':coulomb,
+                    'solv_left':self.left_iso_energies['solv'], # type: ignore
+                    'col_left':self.left_iso_energies['col'], # type: ignore
+                    'solv_right':self.right_iso_energies['solv'], # type: ignore
+                    'col_right':self.right_iso_energies['col'], # type: ignore
+                    'dd_g_solv':dd_g_solv,
+                    'dd_g_col':dd_g_col,
+                    'binding':dd_g_solv + dd_g_col
+                }
             return _energies
 
     def to_json(self,filename: str|Path) -> None:
         out_dict = {}
         out_dict['sim_path'] = str(self.sim_path)
         out_dict['pqr_file'] = str(self.pqr_file)
-        out_dict['apbs_log'] = str(self.apbs_log)
+        out_dict['apbs_log'] = str(self.apbs_log) if self.apbs_log is not None else None
         out_dict['finished_ok'] = self.finished_ok
         out_dict['is_isolated'] = self.is_isolated
+        out_dict['is_yukawa'] = self.yukawa
 
         if self.misc is not None: 
             out_dict['misc'] = self.misc
@@ -92,7 +120,7 @@ class SimulationHandler:
             mesh_size: float,
             sim_name: str,
             core_pdb_path: str|Path,
-            sim_type: Literal['allAtom','coarseGrained'],
+            sim_type: Literal['allAtom','coarseGrained','yukawaCoarseGrained'],
             isolated: bool,
             handler_func: HandlerFunction,
             handler_options: Dict,
@@ -151,8 +179,8 @@ class SimulationHandler:
             self.sim_files['left_xyzr'] = self.sim_path / Path('left_' + self.sim_files['pqr'].stem + '.xyzr')
             self.sim_files['right_xyzr'] = self.sim_path / Path('right_' + self.sim_files['pqr'].stem + '.xyzr')
 
-        if sim_type != 'allAtom' and sim_type != 'coarseGrained':
-            raise ValueError("sim_type must be 'allAtom' or 'coarseGrained'")
+        if sim_type != 'allAtom' and sim_type != 'coarseGrained' and sim_type != 'yukawaCoarseGrained':
+            raise ValueError("sim_type must be 'allAtom', 'coarseGrained' or 'yukawaCoarseGrained'")
 
         self.logger.debug(f'Created {self}')
         pass
@@ -183,7 +211,7 @@ class SimulationHandler:
                     handler_options=self.handler_options,
                     coarse_grain=False
                 ) 
-            elif self.sim_type == 'coarseGrained':
+            elif self.sim_type == 'coarseGrained' or self.sim_type == 'yukawaCoarseGrained':
                 out_pdb,chains = self.handler_func.handle(
                     self.core_pdb,
                     self.sim_path,
@@ -223,24 +251,25 @@ class SimulationHandler:
         except Exception as e:
             self.logger.error(f'Encountered an error in getting wall distance for {self.sim_name}. {e}')
             raise
-        
-        #Generating apbs config file
-        self.logger.info(f'Generating APBS config file for {self.sim_name}')
-        if self.isolated:
-            self.bbox,self.clearance = tools.gen_apbs(
-                self.sim_files['pqr'],
-                self.mesh_size,
-                keep_dx=self.keep_dx,
-                linear=self.linear_pb
-            )
-        else:
-            self.bbox,self.clearance = tools.gen_apbs(
-                self.sim_files['pqr'],
-                self.mesh_size,
-                keep_dx=False,
-                linear=self.linear_pb
-            )
-        self.logger.info(f'{self.sim_name} BBOX: {self.bbox} - Clearance: {self.clearance}')
+
+        if self.sim_type != 'yukawaCoarseGrained':
+            #Generating apbs config file
+            self.logger.info(f'Generating APBS config file for {self.sim_name}')
+            if self.isolated:
+                self.bbox,self.clearance = tools.gen_apbs(
+                    self.sim_files['pqr'],
+                    self.mesh_size,
+                    keep_dx=self.keep_dx,
+                    linear=self.linear_pb
+                )
+            else:
+                self.bbox,self.clearance = tools.gen_apbs(
+                    self.sim_files['pqr'],
+                    self.mesh_size,
+                    keep_dx=False,
+                    linear=self.linear_pb
+                )
+            self.logger.info(f'{self.sim_name} BBOX: {self.bbox} - Clearance: {self.clearance}')
         self.logger.info(f'Finished configuring {self.sim_name} - {self.sim_path}')
         self.sim_configured = True
         return None
@@ -260,33 +289,65 @@ class SimulationHandler:
             self.configure_simulation()
 
         try:
-            _,wall_clock = self._execute_apbs()
-            misc = {'sim_name':self.sim_name,'wall_clock':wall_clock,'status':'ok'}
+
+            if self.sim_type != 'yukawaCoarseGrained':            
+                _,wall_clock = self._execute_apbs()
+                misc = {'sim_name':self.sim_name,'wall_clock':wall_clock,'status':'ok'}
+            else:
+                misc = {'sim_name':self.sim_name,'wall_clock':None,'status':'ok'}
             
             if self.handler_options:
                     misc.update(self.handler_options)
 
             if self.isolated:
-                self.result = SimulationResult(
-                    self.sim_files['pqr'],
-                    self.sim_files['apbs_log'],
-                    self.sim_path,
-                    True,
-                    misc,
-                    self.isolated,
-                )
+                if self.sim_type == 'yukawaCoarseGrained':
+                    self.result = SimulationResult(
+                        pqr_file=self.sim_files['pqr'],
+                        sim_path=self.sim_path,
+                        finished_ok=True,
+                        yukawa=True,
+                        misc=misc,
+                        is_isolated=self.isolated
+                    )
+                    self._finished_ok = True
+                else:
+                    self.result = SimulationResult(
+                        pqr_file=self.sim_files['pqr'],
+                        sim_path=self.sim_path,
+                        finished_ok=True,
+                        yukawa=False,
+                        apbs_log=self.sim_files['apbs_log'],
+                        misc=misc,
+                        is_isolated=self.isolated
+                    )
             else:
-                self.result = SimulationResult(
-                    self.sim_files['pqr'],
-                    self.sim_files['apbs_log'],
-                    self.sim_path,
-                    True,
-                    misc,
-                    self.isolated,
-                    left_iso_energies=self.iso_left_sim.result.energies, # type: ignore
-                    right_iso_energies=self.iso_right_sim.result.energies, # type: ignore
-                    wall_distance=self.wall_distance
-                )
+                if self.sim_type == 'yukawaCoarseGrained':
+                    self.result = SimulationResult(
+                        pqr_file=self.sim_files['pqr'],
+                        sim_path=self.sim_path,
+                        finished_ok=True,
+                        yukawa=True,
+                        misc=misc,
+                        is_isolated=self.isolated,
+                        wall_distance=self.wall_distance,
+                        left_iso_energies=self.iso_left_sim.result.energies, # type: ignore
+                        right_iso_energies=self.iso_right_sim.result.energies # type: ignore
+                    )
+                    self._finished_ok = True
+                else:
+                    self.result = SimulationResult(
+                        pqr_file=self.sim_files['pqr'],
+                        sim_path=self.sim_path,
+                        finished_ok=True,
+                        yukawa=False,
+                        apbs_log=self.sim_files['apbs_log'],
+                        misc=misc,
+                        is_isolated=self.isolated,
+                        wall_distance=self.wall_distance,
+                        left_iso_energies=self.iso_left_sim.result.energies, # type: ignore
+                        right_iso_energies=self.iso_right_sim.result.energies # type: ignore
+                    )
+
         except Exception as e:
             self.logger.error(f'Error in executing apbs for {self.sim_name}. {e}')
             misc = {'sim_name':self.sim_name,'status':'failed'}
@@ -295,12 +356,12 @@ class SimulationHandler:
                 misc.update(self.handler_options)
 
             self.result = SimulationResult(
-                self.sim_files['pqr'],
-                self.sim_files['apbs_log'],
-                self.sim_path,
-                False,
-                misc,
-                True
+                pqr_file=self.sim_files['pqr'],
+                sim_path=self.sim_path,
+                finished_ok=False,
+                yukawa=True,
+                misc=misc,
+                is_isolated=True,
             )
             self.logger.info(f'Simulation {self.sim_name} - ERROR')
             raise
@@ -322,28 +383,51 @@ class SimulationHandler:
         self._finished_ok = finished_ok
 
         if is_isolated:
-            result = SimulationResult(
-                pqr_file,
-                apbs_log,
-                sim_path,
-                finished_ok,
-                misc,
-                is_isolated
-            )
+            if self.sim_type == 'yukawaCoarseGrained':
+                result = SimulationResult(
+                    pqr_file=pqr_file,
+                    sim_path=sim_path,
+                    finished_ok=True,
+                    yukawa=True,
+                    misc=misc,
+                    is_isolated=self.isolated
+                )
+            else:
+                result = SimulationResult(
+                    pqr_file=pqr_file,
+                    sim_path=sim_path,
+                    finished_ok=True,
+                    yukawa=False,
+                    apbs_log=apbs_log,
+                    misc=misc,
+                    is_isolated=self.isolated
+                )
         else:
             left_energies = {'solv':energies['solv_left'],'col':energies['col_left']}
             right_energies = {'solv':energies['solv_right'],'col':energies['col_right']}
-            result = SimulationResult(
-                pqr_file,
-                apbs_log,
-                sim_path,
-                finished_ok,
-                misc,
-                is_isolated,
-                left_iso_energies=left_energies,
-                right_iso_energies=right_energies,
-                wall_distance=dump['wall_distance']
-            )
+            if self.sim_type == 'yukawaCoarseGrained':
+                result = SimulationResult(
+                    pqr_file=pqr_file,
+                    sim_path=sim_path,
+                    finished_ok=True,
+                    yukawa=True,
+                    misc=misc,
+                    is_isolated=self.isolated,
+                    left_iso_energies=left_energies, # type: ignore
+                    right_iso_energies=right_energies # type: ignore
+                )
+            else:
+                result = SimulationResult(
+                    pqr_file=pqr_file,
+                    sim_path=sim_path,
+                    finished_ok=True,
+                    yukawa=False,
+                    apbs_log=apbs_log,
+                    misc=misc,
+                    is_isolated=self.isolated,
+                    left_iso_energies=left_energies, # type: ignore
+                    right_iso_energies=right_energies # type: ignore
+                )
             self.wall_distance = dump['wall_distance']
         
         return result
