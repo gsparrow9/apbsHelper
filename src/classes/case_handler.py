@@ -38,8 +38,8 @@ class CaseHandler:
         self.complex_sims = {}
         self.coarse_grain = coarse_grain
         self.yukawa = yukawa
-        if self.yukawa:
-            self.coarse_grain=True
+        #if self.yukawa:
+        #    self.coarse_grain=True
         self.keep_dx = keep_complex_dx
         self.max_threads = max_threads
         self.linear_pb = linear_pb
@@ -54,7 +54,10 @@ class CaseHandler:
         if sim_name_format is None:
             sim_name_format = 'N${N}_${variant}'
 
-        self._create_simulation_objects(self.handler_options,coarse_grained=coarse_grain,yukawa=yukawa)
+        self._create_simulation_objects(self.handler_options,
+                                        coarse_grained=coarse_grain,
+                                        yukawa=yukawa
+                                        )
         self.logger.debug(f'Created {self}')
         pass
 
@@ -101,9 +104,11 @@ class CaseHandler:
             iso_left_sim_path = self.case_path / 'isolatedLeft' / sim_name
             iso_right_sim_path = self.case_path / 'isolatedRight' / sim_name
 
-            if yukawa:
+            if yukawa and coarse_grained:
                 sim_type = 'yukawaCoarseGrained'
-            elif coarse_grained:
+            elif yukawa and not coarse_grained:
+                sim_type = 'yukawaAllAtom'
+            elif not yukawa and coarse_grained:
                 sim_type = 'coarseGrained'
             else:
                 sim_type = 'allAtom'
@@ -248,6 +253,7 @@ class CaseHandler:
             'core_pdb':[],
             'case_name':[],
             'sim_name':[],
+            'sim_type':[],
             'wall_dst':[],
             'yukawa':[],
             'status':[]
@@ -292,6 +298,7 @@ class CaseHandler:
             results['core_pdb'].append(self.core_pdb_path.name)
             results['case_name'].append(self.case_name)
             results['sim_name'].append(name)
+            results['sim_type'].append(runner.sim_type)
             results['wall_dst'].append(runner.wall_distance)
             results['case_path'].append(self.case_path)
             results['sim_path'].append(result.sim_path)

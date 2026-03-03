@@ -85,7 +85,7 @@ class ConfigHandler:
                 keep_complex_dx=sim_options['keep_complex_dx'],
                 max_threads=self.config['max_threads'],
                 linear_pb=sim_options['linear_pb'],
-                yukawa=sim_options['yukawa_coarse_grain'],
+                yukawa=sim_options['yukawa'],
                 handler_options=handler_options.copy()
             )
             self.logger.debug(f'Created case {case.case_name} for config {self.config_name}')

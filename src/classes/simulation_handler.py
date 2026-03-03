@@ -120,7 +120,7 @@ class SimulationHandler:
             mesh_size: float,
             sim_name: str,
             core_pdb_path: str|Path,
-            sim_type: Literal['allAtom','coarseGrained','yukawaCoarseGrained'],
+            sim_type: Literal['allAtom','coarseGrained','yukawaCoarseGrained','yukawaAllAtom'],
             isolated: bool,
             handler_func: HandlerFunction,
             handler_options: Dict,
@@ -179,8 +179,9 @@ class SimulationHandler:
             self.sim_files['left_xyzr'] = self.sim_path / Path('left_' + self.sim_files['pqr'].stem + '.xyzr')
             self.sim_files['right_xyzr'] = self.sim_path / Path('right_' + self.sim_files['pqr'].stem + '.xyzr')
 
-        if sim_type != 'allAtom' and sim_type != 'coarseGrained' and sim_type != 'yukawaCoarseGrained':
-            raise ValueError("sim_type must be 'allAtom', 'coarseGrained' or 'yukawaCoarseGrained'")
+        if (sim_type != 'allAtom' and sim_type != 'coarseGrained'
+            and sim_type != 'yukawaCoarseGrained' and sim_type != 'yukawaAllAtom'):
+            raise ValueError("sim_type must be 'allAtom', 'coarseGrained', 'yukawaAllAtom' or 'yukawaCoarseGrained'")
 
         self.logger.debug(f'Created {self}')
         pass
@@ -204,7 +205,7 @@ class SimulationHandler:
 
         #Generating PDB file with handler_func
         try:
-            if self.sim_type == 'allAtom':
+            if self.sim_type == 'allAtom' or self.sim_type == 'yukawaAllAtom':
                 out_pdb,chains = self.handler_func.handle(
                     self.core_pdb,
                     self.sim_path,
@@ -252,7 +253,7 @@ class SimulationHandler:
             self.logger.error(f'Encountered an error in getting wall distance for {self.sim_name}. {e}')
             raise
 
-        if self.sim_type != 'yukawaCoarseGrained':
+        if self.sim_type != 'yukawaCoarseGrained' or self.sim_type != 'yukawaAllAtom':
             #Generating apbs config file
             self.logger.info(f'Generating APBS config file for {self.sim_name}')
             if self.isolated:
@@ -290,17 +291,23 @@ class SimulationHandler:
 
         try:
 
-            if self.sim_type != 'yukawaCoarseGrained':            
-                _,wall_clock = self._execute_apbs()
-                misc = {'sim_name':self.sim_name,'wall_clock':wall_clock,'status':'ok'}
+            if 'yukawa' in self.sim_type.lower():        
+                misc = {'sim_name':self.sim_name,
+                        'wall_clock':None,
+                        'status':'ok',
+                        'sim_type':self.sim_type}
             else:
-                misc = {'sim_name':self.sim_name,'wall_clock':None,'status':'ok'}
+                _,wall_clock = self._execute_apbs()
+                misc = {'sim_name':self.sim_name,
+                        'wall_clock':wall_clock,
+                        'status':'ok',
+                        'sim_type':self.sim_type}
             
             if self.handler_options:
                     misc.update(self.handler_options)
 
             if self.isolated:
-                if self.sim_type == 'yukawaCoarseGrained':
+                if 'yukawa' in self.sim_type.lower():
                     self.result = SimulationResult(
                         pqr_file=self.sim_files['pqr'],
                         sim_path=self.sim_path,
@@ -321,7 +328,7 @@ class SimulationHandler:
                         is_isolated=self.isolated
                     )
             else:
-                if self.sim_type == 'yukawaCoarseGrained':
+                if 'yukawa' in self.sim_type.lower():
                     self.result = SimulationResult(
                         pqr_file=self.sim_files['pqr'],
                         sim_path=self.sim_path,
@@ -383,7 +390,7 @@ class SimulationHandler:
         self._finished_ok = finished_ok
 
         if is_isolated:
-            if self.sim_type == 'yukawaCoarseGrained':
+            if self.sim_type == 'yukawaCoarseGrained' or self.sim_type == 'yukawaAllAtom':
                 result = SimulationResult(
                     pqr_file=pqr_file,
                     sim_path=sim_path,
@@ -405,7 +412,7 @@ class SimulationHandler:
         else:
             left_energies = {'solv':energies['solv_left'],'col':energies['col_left']}
             right_energies = {'solv':energies['solv_right'],'col':energies['col_right']}
-            if self.sim_type == 'yukawaCoarseGrained':
+            if self.sim_type == 'yukawaCoarseGrained' or self.sim_type == 'yukawaAllAtom':
                 result = SimulationResult(
                     pqr_file=pqr_file,
                     sim_path=sim_path,
