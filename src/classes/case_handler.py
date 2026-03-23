@@ -254,6 +254,7 @@ class CaseHandler:
             'case_name':[],
             'sim_name':[],
             'sim_type':[],
+            'linear_pb':[],
             'wall_dst':[],
             'yukawa':[],
             'status':[]
@@ -299,6 +300,7 @@ class CaseHandler:
             results['case_name'].append(self.case_name)
             results['sim_name'].append(name)
             results['sim_type'].append(runner.sim_type)
+            results['linear_pb'].append(runner.linear_pb)
             results['wall_dst'].append(runner.wall_distance)
             results['case_path'].append(self.case_path)
             results['sim_path'].append(result.sim_path)

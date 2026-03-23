@@ -295,13 +295,15 @@ class SimulationHandler:
                 misc = {'sim_name':self.sim_name,
                         'wall_clock':None,
                         'status':'ok',
-                        'sim_type':self.sim_type}
+                        'sim_type':self.sim_type,
+                        'linear_pb':self.linear_pb}
             else:
                 _,wall_clock = self._execute_apbs()
                 misc = {'sim_name':self.sim_name,
                         'wall_clock':wall_clock,
                         'status':'ok',
-                        'sim_type':self.sim_type}
+                        'sim_type':self.sim_type,
+                        'linear_pb':self.linear_pb}
             
             if self.handler_options:
                     misc.update(self.handler_options)

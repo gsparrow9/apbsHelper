@@ -423,7 +423,7 @@ def gen_isolated_pqr(pqr_file: str, chains: List[str]) -> int:
     )
     return 0
 
-def calc_yukawa(pqr_file: str|Path, kappa: float=1.1619E9, epsilon_r:float=78.54) -> float:
+def calc_yukawa(pqr_file: str|Path, kappa: float=0.116192195E10, epsilon_r:float=78.54) -> float:
     e = 1.60217663E-19 #C
     epsilon_0 = 8.8541878188E-12 #F/m 
     NA = 6.02214076E23
