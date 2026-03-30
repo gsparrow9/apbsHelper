@@ -262,7 +262,8 @@ def create_pqr_cg(
         pqr_file: str,
         cg_pos: Dict,
         cg_charge: Dict,
-        cg_radius: float=11.185
+        cg_radius: float=11.185,
+        supress_radius: bool=False
     ) -> int:
   """
   Funcion que espera un pqr de ARN, un arreglo de posiciones de cg_pos y una carga.
@@ -299,7 +300,7 @@ def create_pqr_cg(
             f" "                    # 50
             f"{pos[i,2]:>8.3f}"     # 51-58
             f" "                    # 59
-            f"{chg[i,0]:>7.4f}"     # 60-66
+            f"{chg[i,0]:>7.{4 if abs(chg[i,0]) < 10 else 3}f}"     # 60-66
             f" "                    # 67
             f"{cg_radius:>7.4f}"    # 68-73
         ).ljust(73)[:73]
@@ -321,14 +322,23 @@ def create_pqr_cg(
     insert_line = '\n'.join(insert_line)
     new_lines.append(insert_line)     
 
-  #Eliminar todas las cargas existentes
+  #Eliminar todas las cargas existentes y/o los radios.
   temp_file = open(os.path.join(working_dir,'temp.pqr'),'w')
-  awk_command = '''
-    $1 == "ATOM" {
-    $0 = substr($0, 1, 59) " 0.0000" substr($0, 67)
-    }
-    {print}
-    '''
+
+  if supress_radius:
+    awk_command = '''
+        $1 == "ATOM" {
+        $0 = substr($0, 1, 59) " 0.0000 0.0000"
+        }
+        {print}
+        '''
+  else:
+    awk_command = '''
+        $1 == "ATOM" {
+        $0 = substr($0, 1, 59) " 0.0000" substr($0, 67)
+        }
+        {print}
+        '''
   subprocess.run(['awk',awk_command, pqr_filename], stdout=temp_file, cwd=working_dir)
   temp_file.close()
   subprocess.run(['mv','temp.pqr', pqr_filename],stdout=subprocess.DEVNULL, cwd=working_dir)
