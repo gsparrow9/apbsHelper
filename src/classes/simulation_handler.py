@@ -421,6 +421,7 @@ class SimulationHandler:
                     finished_ok=True,
                     yukawa=True,
                     misc=misc,
+                    wall_distance=dump['wall_distance'],
                     is_isolated=self.isolated,
                     left_iso_energies=left_energies, # type: ignore
                     right_iso_energies=right_energies # type: ignore
@@ -433,6 +434,7 @@ class SimulationHandler:
                     yukawa=False,
                     apbs_log=apbs_log,
                     misc=misc,
+                    wall_distance=dump['wall_distance'],
                     is_isolated=self.isolated,
                     left_iso_energies=left_energies, # type: ignore
                     right_iso_energies=right_energies # type: ignore
