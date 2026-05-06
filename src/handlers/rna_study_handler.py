@@ -61,10 +61,6 @@ class many_to_many(HandlerFunction):
           left = complex_rna.select_atoms('chainID D or chainID F')
           right = complex_rna.select_atoms('chainID C or chainID E')
 
-          # # Cut Left Chain to 1-cg bulk sphere
-          # select_str = f'(chainID D and resid 1:5) or (chainID F and resid 36:40)'
-          # left = left.select_atoms(select_str)
-
           right_centroid = right.atoms.positions.mean(axis=0)
           left_centroid = left.atoms.positions.mean(axis=0)
 
@@ -88,12 +84,12 @@ class many_to_many(HandlerFunction):
           left_start_str = get_left_select_str(left_chain_length)
           left_end_str = '(chainID D and resid 1:2) or (chainID F and resid 39:40) and name P'
 
-          right_backbone_axis = -(right.select_atoms(right_end_str).
+          right_backbone_axis = (right.select_atoms(right_end_str).
                                  positions.mean(axis=0) - 
                                  right.select_atoms(right_start_str).
                                  positions.mean(axis=0)
                                  )
-          left_backbone_axis = -(left.select_atoms(left_end_str).
+          left_backbone_axis = (left.select_atoms(left_end_str).
                                  positions.mean(axis=0) - 
                                  left.select_atoms(left_start_str).
                                  positions.mean(axis=0)
@@ -148,9 +144,12 @@ class many_to_many(HandlerFunction):
 
           # Only move Right chain
           ones_matrix = np.ones(right.atoms.positions.shape)
+          left_centroid = left.positions.mean(axis=0)
+          right_centroid = right.positions.mean(axis=0)
+          centroid_vector = right_centroid - left_centroid
           if distance != 0:
                displacement = distance*x_axis*ones_matrix
-               right.atoms.positions = right.atoms.positions + displacement
+               right.atoms.positions = right.atoms.positions + displacement - centroid_vector
 
           # Merge and write pdbs
           u = mda.Merge(left.atoms,right.atoms)
@@ -248,12 +247,12 @@ class one_to_many(HandlerFunction):
           left_start_str = '(chainID F and resid 36:37) or (chainID D and resid 4:5) and name P'
           left_end_str = '(chainID F and resid 39:40) or (chainID D and resid 1:2) and name P'
 
-          right_backbone_axis = -(right.select_atoms(right_end_str).
+          right_backbone_axis = (right.select_atoms(right_end_str).
                                  positions.mean(axis=0) - 
                                  right.select_atoms(right_start_str).
                                  positions.mean(axis=0)
                                  )
-          left_backbone_axis = -(left.select_atoms(left_end_str).
+          left_backbone_axis = (left.select_atoms(left_end_str).
                                  positions.mean(axis=0) - 
                                  left.select_atoms(left_start_str).
                                  positions.mean(axis=0)
@@ -308,9 +307,12 @@ class one_to_many(HandlerFunction):
 
           # Only move Right chain
           ones_matrix = np.ones(right.atoms.positions.shape)
+          left_centroid = left.positions.mean(axis=0)
+          right_centroid = right.positions.mean(axis=0)
+          centroid_vector = right_centroid - left_centroid
           if distance != 0:
                displacement = distance*x_axis*ones_matrix
-               right.atoms.positions = right.atoms.positions + displacement
+               right.atoms.positions = right.atoms.positions + displacement - centroid_vector
 
           # Merge and write pdbs
           u = mda.Merge(left.atoms,right.atoms)
